@@ -1,0 +1,34 @@
+#!/bin/bash
+####################################################################################################
+####################################################################################################
+# This script requires pre-existing registration on hudsoncovidvax.org, along with the population  #
+# of the associated email and password in the vars below. Yes, this sript is garbage, but it works.#
+# Please only use this if you are eligible, and help someone in need of a shot while you're at it. #
+####################################################################################################
+####################################################################################################
+hudsonurl="https://hudsoncovidvax.org/login"
+
+# your email address
+email=""
+# your password
+password=""
+
+# ~90m between logins on a 2h cookie lifetime
+cnt=180
+while true; do
+  if [ $cnt -ge 180 ]; then
+    rm cookiejar
+    cnt=0
+    token=$(curl -s -c cookiejar "$hudsonurl"|grep -oP '_token..\S+>'|cut -f 3 -d \")
+    curl -s -o /dev/null -b cookiejar -c cookiejar -X POST -F "_token=$token" -F "email=$email" -F "password=$password" $hudsonurl
+    userid=$(curl -s -b cookiejar "https://hudsoncovidvax.org/member/list"|grep -oP '/member/\d+'|sort|uniq|cut -f 3 -d /)
+  fi
+  if [ $(curl -s -b cookiejar "https://hudsoncovidvax.org/second/appt/$userid" |grep "IF YOU ARE SEEING THIS MESSAGE, IT MEANS THAT WE ARE NOT ABLE"|wc -l) -ne 1 ]; then
+    echo -e "New appointments available at $hudsonurl."|mail -s "Vaccine Appointments Available" $email
+    # sleep for 30m after notifying
+    cnt=180
+    sleep 1800
+  fi
+  cnt=$((cnt + 1))
+  sleep 30
+done
